@@ -14,8 +14,8 @@ torchvision
 # Experiment and evaluation
 scikit-learn
 tensorboard
+ultralytics
 
 # Optional deployment/export tools can be added later:
 # onnx
 # onnxruntime
-
