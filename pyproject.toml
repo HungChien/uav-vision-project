@@ -1,0 +1,10 @@
+[project]
+name = "uav-vision-project"
+version = "0.1.0"
+description = "Deep learning based UAV vision perception and intelligent analysis project."
+requires-python = ">=3.10"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+

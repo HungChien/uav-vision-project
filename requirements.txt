@@ -1,0 +1,21 @@
+# Core
+numpy
+pandas
+opencv-python
+matplotlib
+seaborn
+tqdm
+pyyaml
+
+# Deep learning
+torch
+torchvision
+
+# Experiment and evaluation
+scikit-learn
+tensorboard
+
+# Optional deployment/export tools can be added later:
+# onnx
+# onnxruntime
+

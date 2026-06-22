@@ -1,0 +1,15 @@
+paths:
+  visdrone_det:
+    root: data/raw/VisDrone/VisDrone2019-DET
+    train_images: data/raw/VisDrone/VisDrone2019-DET/VisDrone2019-DET-train/images
+    train_annotations: data/raw/VisDrone/VisDrone2019-DET/VisDrone2019-DET-train/annotations
+    val_images: data/raw/VisDrone/VisDrone2019-DET/VisDrone2019-DET-val/images
+    val_annotations: data/raw/VisDrone/VisDrone2019-DET/VisDrone2019-DET-val/annotations
+  uav123:
+    root: data/raw/UAV123
+    annotations: data/raw/UAV123/anno
+    videos_or_images: data/raw/UAV123/data_seq
+
+outputs:
+  eda: outputs/eda
+
