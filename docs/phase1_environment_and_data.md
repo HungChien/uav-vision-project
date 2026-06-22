@@ -48,17 +48,17 @@ Large datasets are not tracked by Git. Put them under:
 
 ```text
 data/raw/
-├── VisDrone/
-│   └── VisDrone2019-DET/
-│       ├── VisDrone2019-DET-train/
-│       │   ├── images/
-│       │   └── annotations/
-│       └── VisDrone2019-DET-val/
-│           ├── images/
-│           └── annotations/
-└── UAV123/
-    ├── anno/
-    └── data_seq/
+|-- VisDrone/
+|   `-- VisDrone2019-DET/
+|       |-- VisDrone2019-DET-train/
+|       |   |-- images/
+|       |   `-- annotations/
+|       `-- VisDrone2019-DET-val/
+|           |-- images/
+|           `-- annotations/
+`-- UAV123/
+    |-- anno/
+    `-- data_seq/
 ```
 
 Recommended official entry points:

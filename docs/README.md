@@ -1,4 +1,3 @@
 # Docs
 
-文档目录，用于保存算法说明、实验报告、优化指南和项目总结。
-
+Documentation for dataset analysis, algorithm notes, experiment reports, optimization guidance, and project summaries.

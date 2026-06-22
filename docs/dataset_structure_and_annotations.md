@@ -11,20 +11,20 @@ Downloaded archives:
 
 ```text
 data/raw/VisDrone/archives/
-├── VisDrone2019-DET-train.zip
-└── VisDrone2019-DET-val.zip
+|-- VisDrone2019-DET-train.zip
+`-- VisDrone2019-DET-val.zip
 ```
 
 Extracted structure:
 
 ```text
 data/raw/VisDrone/VisDrone2019-DET/
-├── VisDrone2019-DET-train/
-│   ├── images/
-│   └── annotations/
-└── VisDrone2019-DET-val/
-    ├── images/
-    └── annotations/
+|-- VisDrone2019-DET-train/
+|   |-- images/
+|   `-- annotations/
+`-- VisDrone2019-DET-val/
+    |-- images/
+    `-- annotations/
 ```
 
 Local structure check:
@@ -96,10 +96,10 @@ Local structure:
 
 ```text
 data/raw/UAV123/
-└── anno/
-    ├── *.txt
-    └── att/
-        └── *.txt
+`-- anno/
+    |-- *.txt
+    `-- att/
+        `-- *.txt
 ```
 
 Local structure check:

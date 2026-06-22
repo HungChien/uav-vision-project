@@ -1,10 +1,9 @@
 # Notebooks
 
-用于 EDA、可视化分析和快速实验验证。
+Exploratory notebooks for dataset analysis, visualization, and quick experiment checks.
 
-建议命名：
+Suggested naming:
 
 - `01_visdrone_eda.ipynb`
 - `02_uav123_eda.ipynb`
 - `03_detection_error_analysis.ipynb`
-

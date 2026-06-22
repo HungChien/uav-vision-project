@@ -1,34 +1,33 @@
 # UAV Vision Project
 
-基于深度学习的无人机视觉感知与智能分析系统。
+A research-oriented computer vision project for UAV imagery, focused on dataset analysis, object detection, target tracking, model optimization, and deployment preparation.
 
-本仓库用于组织 DJI 实习任务中的数据理解、目标检测、目标跟踪、模型优化、部署导出和实验报告工作。当前阶段先建立项目目录骨架，后续逐步补充可复现代码和实验记录。
+The repository is organized as a reproducible Python project. It separates configuration, data access, exploratory analysis, model code, scripts, documentation, and tests so experiments can be extended without mixing large local artifacts into version control.
 
 ## Project Scope
 
-- 数据集理解与 EDA：VisDrone、UAV123
-- 目标检测：YOLO / Faster R-CNN / SSD 等模型训练与评估
-- 目标跟踪：SORT / DeepSORT / Siamese 类方法实验
-- 检测跟踪集成：视频流目标检测、多目标跟踪与结果可视化
-- 模型优化：轻量化、剪枝、量化、ONNX / TensorRT 导出
-- 项目交付：代码库、实验报告、模型权重、技术文档
+- Dataset understanding and exploratory data analysis for VisDrone and UAV123 annotations
+- Object detection experiments with models such as YOLO, Faster R-CNN, or SSD
+- Target tracking experiments with methods such as SORT, DeepSORT, or Siamese trackers
+- Detection and tracking integration for image and video inference pipelines
+- Model optimization, including lightweight backbones, pruning, quantization, ONNX export, and TensorRT preparation
+- Experiment documentation, reproducible scripts, and technical reports
 
 ## Repository Layout
 
 ```text
 .
-├── configs/              # 训练、评估、部署配置
-├── data/                 # 本地数据集挂载位置，默认不提交大文件
-├── docs/                 # 技术文档、周报、总结材料
-├── models/               # 权重文件与导出模型，默认不提交大文件
-├── notebooks/            # EDA 与实验型 notebook
-├── outputs/              # 评估结果、可视化、日志、报告产物
-├── scripts/              # 命令行入口脚本
-├── src/uav_vision/       # 核心 Python 包
-└── tests/                # 单元测试与轻量集成测试
+|-- configs/              # Training, evaluation, and deployment configuration
+|-- data/                 # Local dataset mount point; large files are ignored
+|-- docs/                 # Technical notes, reports, and dataset documentation
+|-- models/               # Local checkpoints and exported models; large files are ignored
+|-- notebooks/            # Exploratory notebooks
+|-- outputs/              # Local reports, plots, logs, and analysis outputs
+|-- scripts/              # Command-line entry points
+|-- src/uav_vision/       # Core Python package
+`-- tests/                # Unit and lightweight integration tests
 ```
 
 ## Status
 
-Step 1: repository skeleton created.
-
+Initial project structure and phase-one dataset analysis utilities are in place.

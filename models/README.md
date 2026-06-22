@@ -1,7 +1,6 @@
 # Models
 
-模型权重和导出产物目录。大文件默认不提交到 Git。
+Local model checkpoints and exported deployment artifacts. Large files are ignored by default.
 
-- `checkpoints/`: 训练中的 checkpoint 和最佳权重
-- `exported/`: ONNX、TensorRT engine 等部署产物
-
+- `checkpoints/`: Training checkpoints and selected model weights
+- `exported/`: ONNX files, TensorRT engines, and other deployment artifacts
