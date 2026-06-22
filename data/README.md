@@ -2,7 +2,7 @@
 
 This directory is used for local datasets. Raw data should not be committed to Git.
 
-Recommended structure:
+Local data layout:
 
 ```text
 data/

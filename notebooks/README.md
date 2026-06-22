@@ -2,7 +2,7 @@
 
 Exploratory notebooks for dataset analysis, visualization, and quick experiment checks.
 
-Suggested naming:
+Notebook index:
 
 - `01_visdrone_eda.ipynb`
 - `02_uav123_eda.ipynb`

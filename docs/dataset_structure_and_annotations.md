@@ -40,7 +40,7 @@ Annotation format, one `.txt` file per image:
 bbox_left,bbox_top,bbox_width,bbox_height,score,category_id,truncation,occlusion
 ```
 
-Example:
+Annotation rows:
 
 ```text
 871,572,54,92,1,4,0,0
@@ -115,7 +115,7 @@ Sequence bbox annotation format, one `.txt` file per sequence:
 x,y,width,height
 ```
 
-Example:
+Annotation rows:
 
 ```text
 703,361,57,114
@@ -131,7 +131,7 @@ NaN,NaN,NaN,NaN
 
 These rows should be treated as frames without a valid target box, often caused by out-of-view or fully invisible target states.
 
-Attribute annotation files under `att/` use multi-column binary flags, for example:
+Attribute annotation files under `att/` use multi-column binary flags:
 
 ```text
 1,1,0,1,0,0,0,0,1,1,1,1

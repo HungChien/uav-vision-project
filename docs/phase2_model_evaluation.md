@@ -98,7 +98,7 @@ Class-level recall at IoU 0.5:
 
 Observation:
 
-The model is strongest on cars, which are the most frequent and visually consistent class. Bicycle, awning-tricycle, and tricycle are weak classes, likely due to smaller object size, class ambiguity, and fewer examples.
+The model is strongest on cars, which are the most frequent and visually consistent class. Bicycle, awning-tricycle, and tricycle are weak classes, likely due to smaller object size, class ambiguity, and fewer training instances.
 
 ## Summary
 

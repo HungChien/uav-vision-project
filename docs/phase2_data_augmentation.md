@@ -14,7 +14,7 @@ Data augmentation is used to improve generalization under UAV-specific visual co
 
 The training pipeline uses Ultralytics YOLO augmentations. The selected augmentation profile is moderate rather than extreme, because UAV images contain many small objects and aggressive geometric transforms can make tiny boxes unusable.
 
-Recommended profile:
+Training profile:
 
 | Augmentation | Value | Purpose |
 | --- | ---: | --- |
@@ -68,7 +68,7 @@ Observation:
 
 The stronger augmentation profile did not improve the 10-epoch result. This is expected for a short run on a small-object-heavy aerial dataset: rotation, perspective, scale, and MixUp increase learning difficulty and may require longer training or a milder policy.
 
-Recommended next profile:
+Next training profile:
 
 ```text
 degrees: 5

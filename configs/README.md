@@ -6,3 +6,7 @@ Configuration files for data preparation, training, evaluation, tracking, optimi
 - `detection/`: Object detection training and evaluation settings
 - `tracking/`: Single-object and multi-object tracking settings
 - `deployment/`: ONNX, TensorRT, and quantization settings
+
+Current dataset path configuration:
+
+- `data/visdrone.yaml`

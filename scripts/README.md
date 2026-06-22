@@ -2,11 +2,11 @@
 
 Command-line entry points for repeatable project workflows.
 
-Suggested future scripts:
+Workflow coverage:
 
-- `prepare_data.py`
 - `run_eda.py`
-- `train_detector.py`
-- `evaluate_detector.py`
-- `run_tracker.py`
-- `export_model.py`
+- `convert_visdrone_to_yolo.py`
+- `train_yolo_visdrone.py`
+- `evaluate_visdrone_detector.py`
+- `download_datasets.py`
+- `check_env.py`

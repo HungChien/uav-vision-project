@@ -61,12 +61,12 @@ data/raw/
     `-- data_seq/
 ```
 
-Recommended official entry points:
+Official dataset entry points:
 
 - VisDrone: https://github.com/VisDrone/VisDrone-Dataset
 - UAV123: https://cemse.kaust.edu.sa/ivul/uav123
 
-Because these datasets are large and mirrors change over time, keep the canonical links in documentation and download manually or use `scripts/download_datasets.py` after filling direct archive URLs.
+Because these datasets are large and mirrors change over time, the repository records canonical source links and keeps dataset files outside Git.
 
 ## EDA Goals
 
