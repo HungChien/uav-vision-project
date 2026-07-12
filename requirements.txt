@@ -15,7 +15,9 @@ torchvision
 scikit-learn
 tensorboard
 ultralytics
+lap>=0.5.12
+onnx
+onnxruntime
+onnxruntime-gpu
 
-# Optional deployment/export tools can be added later:
-# onnx
-# onnxruntime
+# Optional acceleration tools can be added later:

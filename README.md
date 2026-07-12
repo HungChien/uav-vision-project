@@ -30,4 +30,4 @@ The repository is organized as a reproducible Python project. It separates confi
 
 ## Status
 
-Initial project structure and phase-one dataset analysis utilities are in place.
+Dataset analysis, detection training, model evaluation, and the first tracking evaluation baseline are in place.
