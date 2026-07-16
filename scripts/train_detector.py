@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import argparse
 from pathlib import Path
@@ -10,6 +10,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Train YOLOv8s on the VisDrone detection dataset.")
     parser.add_argument("--data", type=Path, default=Path("data/processed/visdrone_yolo/visdrone.yaml"))
     parser.add_argument("--model", default="yolov8s.pt", help="Ultralytics model checkpoint or model YAML.")
+    parser.add_argument("--pretrained-weights", type=Path, help="Optional checkpoint used to initialize a YAML-defined model.")
     parser.add_argument("--epochs", type=int, default=50)
     parser.add_argument("--imgsz", type=int, default=960)
     parser.add_argument("--batch", type=int, default=8)
@@ -20,6 +21,7 @@ def main() -> None:
     parser.add_argument("--patience", type=int, default=15)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--cache", action="store_true")
+    parser.add_argument("--resume", action="store_true", help="Resume training from a previous Ultralytics checkpoint.")
     parser.add_argument("--degrees", type=float, default=0.0, help="Random rotation range in degrees.")
     parser.add_argument("--translate", type=float, default=0.1, help="Random translation fraction.")
     parser.add_argument("--scale", type=float, default=0.5, help="Random scale gain.")
@@ -37,9 +39,13 @@ def main() -> None:
     args = parser.parse_args()
 
     if not args.data.exists():
-        raise FileNotFoundError(f"Dataset YAML not found: {args.data}. Run scripts/convert_visdrone_to_yolo.py first.")
+        raise FileNotFoundError(f"Dataset YAML not found: {args.data}. Run scripts/prepare_visdrone_yolo.py first.")
 
     model = YOLO(args.model)
+    if args.pretrained_weights:
+        if not args.pretrained_weights.exists():
+            raise FileNotFoundError(f"Pretrained checkpoint not found: {args.pretrained_weights}")
+        model.load(str(args.pretrained_weights))
     project_dir = Path(args.project).resolve()
     model.train(
         data=str(args.data),
@@ -53,6 +59,7 @@ def main() -> None:
         patience=args.patience,
         seed=args.seed,
         cache=args.cache,
+        resume=args.resume,
         pretrained=True,
         degrees=args.degrees,
         translate=args.translate,

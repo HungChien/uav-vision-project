@@ -1,4 +1,4 @@
-# Phase 2: Model Evaluation
+﻿# Phase 2: Model Evaluation
 
 ## Goal
 
@@ -14,7 +14,7 @@ Metrics covered:
 ## Command
 
 ```powershell
-& "D:\Anaconda3\envs\ml-gpu\python.exe" scripts/evaluate_visdrone_detector.py --weights outputs/training/yolov8s_visdrone_baseline_e10/weights/best.pt --imgsz 960 --conf 0.25 --iou 0.5
+& "D:\Anaconda3\envs\ml-gpu\python.exe" scripts/evaluate_detector.py --weights outputs/training/yolov8s_visdrone_baseline_e10/weights/best.pt --imgsz 960 --conf 0.25 --iou 0.5
 ```
 
 Outputs:

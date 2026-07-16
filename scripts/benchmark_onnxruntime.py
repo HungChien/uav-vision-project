@@ -33,21 +33,29 @@ def letterbox(image: np.ndarray, size: int) -> np.ndarray:
     return canvas
 
 
-def preprocess(image: np.ndarray, size: int) -> np.ndarray:
+def preprocess(image: np.ndarray, size: int, dtype: np.dtype = np.float32) -> np.ndarray:
     image = letterbox(image, size)
     image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-    image = image.transpose(2, 0, 1).astype(np.float32) / 255.0
+    image = image.transpose(2, 0, 1).astype(dtype) / 255.0
     return np.expand_dims(image, axis=0)
 
 
-def load_inputs(image_paths: list[Path], size: int) -> list[np.ndarray]:
+def load_inputs(image_paths: list[Path], size: int, dtype: np.dtype = np.float32) -> list[np.ndarray]:
     inputs = []
     for path in image_paths:
         image = cv2.imread(str(path))
         if image is None:
             continue
-        inputs.append(preprocess(image, size))
+        inputs.append(preprocess(image, size, dtype))
     return inputs
+
+
+def count_readable_images(image_paths: list[Path]) -> int:
+    count = 0
+    for path in image_paths:
+        if cv2.imread(str(path)) is not None:
+            count += 1
+    return count
 
 
 def create_session(model_path: Path, provider: str) -> tuple[ort.InferenceSession | None, str | None]:
@@ -88,6 +96,13 @@ def benchmark_session(session: ort.InferenceSession, inputs: list[np.ndarray], w
     }
 
 
+def input_dtype_for_session(session: ort.InferenceSession) -> np.dtype:
+    input_type = session.get_inputs()[0].type
+    if input_type == "tensor(float16)":
+        return np.float16
+    return np.float32
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Benchmark ONNXRuntime execution providers on preprocessed image tensors.")
     parser.add_argument("--model", type=Path, default=Path("models/exported/yolov8s_visdrone_aug_e10.onnx"))
@@ -106,17 +121,13 @@ def main() -> None:
     image_paths = sorted(args.images.glob("*.jpg"))
     if args.limit > 0:
         image_paths = image_paths[: args.limit]
-    inputs = load_inputs(image_paths, args.imgsz)
-    if not inputs:
-        raise FileNotFoundError(f"No readable images found in {args.images}")
-
     args.output.mkdir(parents=True, exist_ok=True)
     report = {
         "model": str(args.model),
         "images": str(args.images),
         "imgsz": args.imgsz,
         "requested_image_count": len(image_paths),
-        "readable_image_count": len(inputs),
+        "readable_image_count": count_readable_images(image_paths),
         "onnxruntime_version": ort.__version__,
         "available_providers": ort.get_available_providers(),
         "preload_cuda_dlls": bool(args.preload_cuda_dlls),
@@ -128,9 +139,13 @@ def main() -> None:
         if session is None:
             report["providers"][provider] = {"available": False, "error": error}
             continue
+        inputs = load_inputs(image_paths, args.imgsz, input_dtype_for_session(session))
+        if not inputs:
+            raise FileNotFoundError(f"No readable images found in {args.images}")
         metrics = benchmark_session(session, inputs, args.warmup)
         metrics["available"] = error is None
         metrics["active_providers"] = session.get_providers()
+        metrics["input_type"] = session.get_inputs()[0].type
         if error:
             metrics["warning"] = error
         report["providers"][provider] = metrics

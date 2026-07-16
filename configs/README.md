@@ -1,12 +1,12 @@
-# Configs
+﻿# Configs
 
-Configuration files for data preparation, training, evaluation, tracking, optimization, and deployment.
+Configuration files for data preparation, model training, evaluation, and deployment experiments.
 
 - `data/`: Dataset paths, category mappings, and split settings
-- `detection/`: Object detection training and evaluation settings
-- `tracking/`: Single-object and multi-object tracking settings
-- `deployment/`: ONNX, TensorRT, and quantization settings
+- `detection/`: YOLO detector architecture and slimming settings
 
-Current dataset path configuration:
+Current configuration files:
 
 - `data/visdrone.yaml`
+- `detection/yolov8s_slim_width0375.yaml`
+- `detection/yolov8s_slim_width04375.yaml`

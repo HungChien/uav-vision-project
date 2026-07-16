@@ -46,7 +46,7 @@ These baselines use ground-truth annotation history, so they are not deployable 
 Command:
 
 ```powershell
-& "D:\Anaconda3\envs\ml-gpu\python.exe" scripts/evaluate_uav123_tracking.py --annotations data/raw/UAV123/anno --output outputs/tracking/uav123_annotation_baselines
+& "D:\Anaconda3\envs\ml-gpu\python.exe" scripts/evaluate_tracking_annotations.py --annotations data/raw/UAV123/anno --output outputs/tracking/uav123_annotation_baselines
 ```
 
 Annotation-only results:
@@ -77,9 +77,9 @@ The model files are local runtime artifacts and are excluded from version contro
 Commands:
 
 ```powershell
-& "D:\Anaconda3\envs\ml-gpu\python.exe" scripts/evaluate_uav123_opencv_tracker.py --trackers KCF --output outputs/tracking/uav123_opencv_kcf
-& "D:\Anaconda3\envs\ml-gpu\python.exe" scripts/evaluate_uav123_opencv_tracker.py --trackers CSRT --output outputs/tracking/uav123_opencv_csrt
-& "D:\Anaconda3\envs\ml-gpu\python.exe" scripts/evaluate_uav123_opencv_tracker.py --trackers DASIAMRPN --output outputs/tracking/uav123_opencv_dasiamrpn
+& "D:\Anaconda3\envs\ml-gpu\python.exe" scripts/evaluate_single_object_trackers.py --trackers KCF --output outputs/tracking/uav123_opencv_kcf
+& "D:\Anaconda3\envs\ml-gpu\python.exe" scripts/evaluate_single_object_trackers.py --trackers CSRT --output outputs/tracking/uav123_opencv_csrt
+& "D:\Anaconda3\envs\ml-gpu\python.exe" scripts/evaluate_single_object_trackers.py --trackers DASIAMRPN --output outputs/tracking/uav123_opencv_dasiamrpn
 ```
 
 Output files:
@@ -143,7 +143,7 @@ The final tracking-stage experiment connects the trained YOLOv8s VisDrone detect
 Command:
 
 ```powershell
-& "D:\Anaconda3\envs\ml-gpu\python.exe" scripts/run_uav_vision_demo.py --source data/raw/UAV123/data_seq/UAV123/group1 --mode track --backend pt --max-frames 600 --save-video --output outputs/tracking/yolov8s_bytetrack_uav123_group1_1
+& "D:\Anaconda3\envs\ml-gpu\python.exe" scripts/run_pipeline.py --source data/raw/UAV123/data_seq/UAV123/group1 --mode track --backend pt --max-frames 600 --save-video --output outputs/tracking/yolov8s_bytetrack_uav123_group1_1
 ```
 
 Output files:
@@ -176,3 +176,64 @@ Class counts:
 | pedestrian | 1866 |
 
 The result confirms that the trained detector can be connected to ByteTrack for multi-object ID assignment on UAV video frames. The 600-frame run produces 1866 tracked pedestrian rows and 7 unique track IDs. The end-to-end speed is 56.53 FPS with visualization and video writing enabled, which is practical for real-time experimentation.
+
+## Integrated Detection and Tracking Pipeline
+
+The integrated runtime pipeline now supports image files, video files, and frame directories. It can run detection-only mode or detection-plus-tracking mode with PyTorch, ONNX, or TensorRT engine backends.
+
+Pipeline:
+
+```text
+input image/video/frame directory
+-> YOLO detector
+-> ByteTrack ID assignment
+-> annotated frames or video
+-> structured CSV and JSON outputs
+```
+
+Updated entry point:
+
+```text
+scripts/run_pipeline.py
+```
+
+TensorRT FP16 integration command:
+
+```powershell
+& "D:\Anaconda3\envs\ml-gpu\python.exe" scripts/run_pipeline.py --source data/raw/UAV123/data_seq/UAV123/group1 --mode track --backend engine --engine models/exported/yolov8s_slim04375_visdrone_e100_fp16.engine --tracker bytetrack.yaml --max-frames 300 --save-video --output outputs/tracking/yolov8s_slim04375_tensorrt_bytetrack_uav123_group1
+```
+
+Output files:
+
+```text
+outputs/tracking/yolov8s_slim04375_tensorrt_bytetrack_uav123_group1/
+|-- summary.json
+|-- tracks.csv
+|-- track_visualization.mp4
+`-- visualizations/
+    |-- 000001_track.jpg
+    |-- 000150_track.jpg
+    `-- 000300_track.jpg
+```
+
+Actual TensorRT FP16 plus ByteTrack run:
+
+| Item | Value |
+| --- | ---: |
+| Detector backend | `TensorRT FP16 engine` |
+| Detector model | `yolov8s_slim04375_visdrone_e100_fp16.engine` |
+| Tracker | `bytetrack.yaml` |
+| Sequence | `group1` |
+| Processed frames | 300 |
+| Track rows | 1070 |
+| Unique track IDs | 10 |
+| FPS | 43.05 |
+
+Class counts:
+
+| Class | Count |
+| --- | ---: |
+| pedestrian | 1068 |
+| van | 2 |
+
+This run verifies the complete processing flow with the deployment-optimized detector. The system accepts a raw frame directory, performs object detection, assigns persistent track IDs through ByteTrack, and saves both visual outputs and machine-readable tracking results.

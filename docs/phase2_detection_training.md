@@ -1,4 +1,4 @@
-# Phase 2: Detection Training
+﻿# Phase 2: Detection Training
 
 ## Model Choice
 
@@ -28,7 +28,7 @@ class_id x_center y_center width height
 Run conversion:
 
 ```powershell
-& "D:\Anaconda3\envs\ml-gpu\python.exe" scripts/convert_visdrone_to_yolo.py
+& "D:\Anaconda3\envs\ml-gpu\python.exe" scripts/prepare_visdrone_yolo.py
 ```
 
 The converter excludes `ignored` and `others` categories, then maps the ten standard VisDrone object classes to YOLO class IDs.
@@ -38,13 +38,13 @@ The converter excludes `ignored` and `others` categories, then maps the ten stan
 Smoke test:
 
 ```powershell
-& "D:\Anaconda3\envs\ml-gpu\python.exe" scripts/train_yolo_visdrone.py --epochs 1 --imgsz 640 --batch 4 --name yolov8s_visdrone_smoke
+& "D:\Anaconda3\envs\ml-gpu\python.exe" scripts/train_detector.py --epochs 1 --imgsz 640 --batch 4 --name yolov8s_visdrone_smoke
 ```
 
 Baseline training:
 
 ```powershell
-& "D:\Anaconda3\envs\ml-gpu\python.exe" scripts/train_yolo_visdrone.py --epochs 50 --imgsz 960 --batch 8 --name yolov8s_visdrone
+& "D:\Anaconda3\envs\ml-gpu\python.exe" scripts/train_detector.py --epochs 50 --imgsz 960 --batch 8 --name yolov8s_visdrone
 ```
 
 Outputs are written under:

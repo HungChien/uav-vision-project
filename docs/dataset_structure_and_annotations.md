@@ -1,4 +1,4 @@
-# Dataset Structure And Annotation Format
+﻿# Dataset Structure And Annotation Format
 
 ## VisDrone2019-DET
 
@@ -145,5 +145,5 @@ Status note:
 - Run annotation EDA with:
 
 ```powershell
-& "D:\Anaconda3\envs\ml-gpu\python.exe" scripts/run_eda.py uav123 --annotations data/raw/UAV123/anno --output outputs/eda/uav123
+& "D:\Anaconda3\envs\ml-gpu\python.exe" scripts/analyze_datasets.py uav123 --annotations data/raw/UAV123/anno --output outputs/eda/uav123
 ```

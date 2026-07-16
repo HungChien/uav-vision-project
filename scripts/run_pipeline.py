@@ -30,6 +30,8 @@ def resolve_model_path(args: argparse.Namespace) -> Path:
         return args.weights
     if args.backend == "onnx":
         return args.onnx
+    if args.backend == "engine":
+        return args.engine
     raise ValueError(f"Unsupported backend: {args.backend}")
 
 
@@ -195,6 +197,7 @@ def process_frames(model: YOLO, frames: list[tuple[str, np.ndarray]], args: argp
         "mode": args.mode,
         "backend": args.backend,
         "model": str(resolve_model_path(args)),
+        "tracker": args.tracker if args.mode == "track" else None,
         "processed_frames": processed_frames,
         "total_rows": len(all_rows),
         "unique_track_ids": len(track_ids),
@@ -243,9 +246,10 @@ def main() -> None:
     parser.add_argument("--source", type=Path, required=True)
     parser.add_argument("--output", type=Path, default=Path("outputs/deployment/uav_vision_demo"))
     parser.add_argument("--mode", choices=["detect", "track"], default="detect")
-    parser.add_argument("--backend", choices=["pt", "onnx"], default="pt")
+    parser.add_argument("--backend", choices=["pt", "onnx", "engine"], default="pt")
     parser.add_argument("--weights", type=Path, default=Path("outputs/training/yolov8s_visdrone_aug_e10/weights/best.pt"))
     parser.add_argument("--onnx", type=Path, default=Path("models/exported/yolov8s_visdrone_aug_e10.onnx"))
+    parser.add_argument("--engine", type=Path, default=Path("models/exported/yolov8s_slim04375_visdrone_e100_fp16.engine"))
     parser.add_argument("--tracker", default="bytetrack.yaml")
     parser.add_argument("--imgsz", type=int, default=960)
     parser.add_argument("--conf", type=float, default=0.25)

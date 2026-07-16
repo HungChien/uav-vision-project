@@ -1,4 +1,4 @@
-# Phase 2: Data Augmentation
+﻿# Phase 2: Data Augmentation
 
 ## Goal
 
@@ -36,13 +36,13 @@ Training profile:
 Short augmented experiment:
 
 ```powershell
-& "D:\Anaconda3\envs\ml-gpu\python.exe" scripts/train_yolo_visdrone.py --epochs 10 --imgsz 960 --batch 8 --workers 4 --name yolov8s_visdrone_aug_e10 --degrees 10 --translate 0.12 --scale 0.7 --shear 2 --perspective 0.0005 --hsv-h 0.015 --hsv-s 0.7 --hsv-v 0.45 --fliplr 0.5 --flipud 0 --mosaic 1.0 --mixup 0.05 --close-mosaic 3
+& "D:\Anaconda3\envs\ml-gpu\python.exe" scripts/train_detector.py --epochs 10 --imgsz 960 --batch 8 --workers 4 --name yolov8s_visdrone_aug_e10 --degrees 10 --translate 0.12 --scale 0.7 --shear 2 --perspective 0.0005 --hsv-h 0.015 --hsv-s 0.7 --hsv-v 0.45 --fliplr 0.5 --flipud 0 --mosaic 1.0 --mixup 0.05 --close-mosaic 3
 ```
 
 Longer training can reuse the same profile with more epochs:
 
 ```powershell
-& "D:\Anaconda3\envs\ml-gpu\python.exe" scripts/train_yolo_visdrone.py --epochs 50 --imgsz 960 --batch 8 --workers 4 --name yolov8s_visdrone_aug_e50 --degrees 10 --translate 0.12 --scale 0.7 --shear 2 --perspective 0.0005 --hsv-h 0.015 --hsv-s 0.7 --hsv-v 0.45 --fliplr 0.5 --flipud 0 --mosaic 1.0 --mixup 0.05 --close-mosaic 10
+& "D:\Anaconda3\envs\ml-gpu\python.exe" scripts/train_detector.py --epochs 50 --imgsz 960 --batch 8 --workers 4 --name yolov8s_visdrone_aug_e50 --degrees 10 --translate 0.12 --scale 0.7 --shear 2 --perspective 0.0005 --hsv-h 0.015 --hsv-s 0.7 --hsv-v 0.45 --fliplr 0.5 --flipud 0 --mosaic 1.0 --mixup 0.05 --close-mosaic 10
 ```
 
 ## Experiment Result

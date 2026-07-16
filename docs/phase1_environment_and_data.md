@@ -1,4 +1,4 @@
-# Phase 1: Environment And Data Understanding
+﻿# Phase 1: Environment And Data Understanding
 
 ## Environment
 
@@ -27,7 +27,7 @@ Observed package status:
 Run the reproducible check:
 
 ```powershell
-& "D:\Anaconda3\envs\ml-gpu\python.exe" scripts/check_env.py
+& "D:\Anaconda3\envs\ml-gpu\python.exe" scripts/check_environment.py
 ```
 
 Optional install:
@@ -88,17 +88,17 @@ UAV123 tracking EDA:
 Check environment:
 
 ```powershell
-& "D:\Anaconda3\envs\ml-gpu\python.exe" scripts/check_env.py
+& "D:\Anaconda3\envs\ml-gpu\python.exe" scripts/check_environment.py
 ```
 
 Run VisDrone EDA after downloading data:
 
 ```powershell
-& "D:\Anaconda3\envs\ml-gpu\python.exe" scripts/run_eda.py visdrone-det --images data/raw/VisDrone/VisDrone2019-DET/VisDrone2019-DET-train/images --annotations data/raw/VisDrone/VisDrone2019-DET/VisDrone2019-DET-train/annotations --output outputs/eda/visdrone_train
+& "D:\Anaconda3\envs\ml-gpu\python.exe" scripts/analyze_datasets.py visdrone-det --images data/raw/VisDrone/VisDrone2019-DET/VisDrone2019-DET-train/images --annotations data/raw/VisDrone/VisDrone2019-DET/VisDrone2019-DET-train/annotations --output outputs/eda/visdrone_train
 ```
 
 Run UAV123 EDA after downloading data:
 
 ```powershell
-& "D:\Anaconda3\envs\ml-gpu\python.exe" scripts/run_eda.py uav123 --annotations data/raw/UAV123/anno --output outputs/eda/uav123
+& "D:\Anaconda3\envs\ml-gpu\python.exe" scripts/analyze_datasets.py uav123 --annotations data/raw/UAV123/anno --output outputs/eda/uav123
 ```

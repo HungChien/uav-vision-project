@@ -29,13 +29,15 @@ def synchronize_if_needed(device: str) -> None:
         torch.cuda.synchronize()
 
 
-def export_onnx(weights: Path, output: Path, imgsz: int, opset: int, simplify: bool) -> Path:
+def export_onnx(weights: Path, output: Path, imgsz: int, opset: int, simplify: bool, half: bool, device: str) -> Path:
     output.parent.mkdir(parents=True, exist_ok=True)
     if output.exists():
         return output
 
     model = YOLO(str(weights))
-    exported = Path(model.export(format="onnx", imgsz=imgsz, opset=opset, simplify=simplify, dynamic=False))
+    exported = Path(
+        model.export(format="onnx", imgsz=imgsz, opset=opset, simplify=simplify, dynamic=False, half=half, device=device)
+    )
     if exported.resolve() != output.resolve():
         shutil.copy2(exported, output)
     return output
@@ -140,7 +142,15 @@ def timed_predict(model: YOLO, image: np.ndarray, imgsz: int, conf: float, devic
 
 
 def verify(args: argparse.Namespace) -> dict:
-    onnx_path = export_onnx(args.weights, args.onnx, args.imgsz, args.opset, args.simplify)
+    onnx_path = export_onnx(args.weights, args.onnx, args.imgsz, args.opset, args.simplify, args.half, args.device)
+    if args.export_only:
+        return {
+            "weights": str(args.weights),
+            "onnx": str(onnx_path),
+            "imgsz": args.imgsz,
+            "half": bool(args.half),
+            "export_only": True,
+        }
     image_paths = sorted(args.images.glob("*.jpg"))
     if args.limit > 0:
         image_paths = image_paths[: args.limit]
@@ -205,6 +215,7 @@ def verify(args: argparse.Namespace) -> dict:
         "match_iou_threshold": args.match_iou,
         "pytorch_device": args.device,
         "onnx_provider": "CPUExecutionProvider",
+        "half": bool(args.half),
         "pytorch_fps": float(len(results) / pytorch_seconds) if pytorch_seconds > 0 else 0.0,
         "onnx_fps": float(len(results) / onnx_seconds) if onnx_seconds > 0 else 0.0,
         "pytorch_seconds_per_image": float(pytorch_seconds / len(results)) if len(results) else 0.0,
@@ -234,6 +245,8 @@ def main() -> None:
     parser.add_argument("--warmup", type=int, default=10)
     parser.add_argument("--opset", type=int, default=12)
     parser.add_argument("--simplify", action="store_true")
+    parser.add_argument("--half", action="store_true", help="Export an FP16 ONNX model. Use this for GPU-backed runtime benchmarks.")
+    parser.add_argument("--export-only", action="store_true", help="Export ONNX without running PyTorch versus ONNXRuntime verification.")
     args = parser.parse_args()
 
     summary = verify(args)

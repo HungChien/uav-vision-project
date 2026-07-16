@@ -15,9 +15,12 @@ torchvision
 scikit-learn
 tensorboard
 ultralytics
+torch-pruning
 lap>=0.5.12
 onnx
 onnxruntime
 onnxruntime-gpu
 
-# Optional acceleration tools can be added later:
+# Optional TensorRT deployment
+tensorrt
+nvidia-modelopt[onnx]
