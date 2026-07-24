@@ -132,12 +132,12 @@ def read_training_metrics(results_csv: Path) -> dict[str, float] | None:
         rows = list(csv.DictReader(file))
     if not rows:
         return None
-    last = rows[-1]
+    best = max(rows, key=lambda row: float(row["metrics/mAP50-95(B)"]))
     return {
-        "precision": float(last["metrics/precision(B)"]),
-        "recall": float(last["metrics/recall(B)"]),
-        "map50": float(last["metrics/mAP50(B)"]),
-        "map50_95": float(last["metrics/mAP50-95(B)"]),
+        "precision": float(best["metrics/precision(B)"]),
+        "recall": float(best["metrics/recall(B)"]),
+        "map50": float(best["metrics/mAP50(B)"]),
+        "map50_95": float(best["metrics/mAP50-95(B)"]),
     }
 
 

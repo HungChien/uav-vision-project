@@ -1,4 +1,4 @@
-﻿# Phase 4: ONNX and TensorRT Deployment Benchmark
+# Phase 4: ONNX and TensorRT Deployment Benchmark
 
 ## Goal
 
@@ -111,3 +111,7 @@ TensorRT INT8 is not beneficial in this run. It reduces mAP50 by 0.02979 and mAP
 The recommended deployment target for the current `YOLOv8s-slim 0.4375 e100` model is TensorRT FP16.
 
 INT8 should not be selected for the current model and calibration setup because it is both less accurate and slower than TensorRT FP16 in the actual benchmark.
+
+## Follow-up Study
+
+Bright, dark, and high-density calibration sets plus backbone, neck, and detection-head mixed-precision variants were evaluated in a follow-up experiment. The expanded study confirmed TensorRT FP16 as the deployment target. See `phase4_int8_scene_calibration.md` for the complete results.

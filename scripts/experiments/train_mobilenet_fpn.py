@@ -3,16 +3,21 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import math
 import random
 import time
 from collections import defaultdict
 from pathlib import Path
+from types import MethodType
 
 import cv2
+import matplotlib.pyplot as plt
 import numpy as np
 import torch
-from torch.utils.data import DataLoader, Dataset
+import torch.nn.functional as F
+from torch.utils.data import DataLoader, Dataset, WeightedRandomSampler
 from torchvision.models.detection import FasterRCNN_MobileNet_V3_Large_FPN_Weights, fasterrcnn_mobilenet_v3_large_fpn
+from torchvision.models.detection.anchor_utils import AnchorGenerator
 from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
 
 
@@ -187,15 +192,160 @@ class VisDroneDetectionDataset(Dataset):
         return image_tensor, target
 
 
+def small_object_sampling_weights(
+    dataset: VisDroneDetectionDataset,
+    area_threshold: float,
+    strength: float,
+) -> list[float]:
+    weights = []
+    for sample in dataset.samples:
+        objects = read_annotation(sample["annotation"])
+        tile = sample["tile"]
+        if tile is not None:
+            objects = [obj for obj in objects if intersect_box(obj["box"], tile, dataset.min_visible) is not None]
+        small_count = sum(1 for obj in objects if obj["area"] < area_threshold)
+        small_fraction = small_count / max(1, len(objects))
+        weights.append(1.0 + strength * small_fraction)
+    return weights
+
+
 def collate_fn(batch):
     return tuple(zip(*batch))
 
 
-def build_model(num_classes: int, min_size: int, max_size: int, pretrained: bool):
+def count_training_instances(annotations_dir: Path) -> dict[int, int]:
+    counts = {category_id: 0 for category_id in VISDRONE_CATEGORIES}
+    for path in sorted(annotations_dir.glob("*.txt")):
+        for obj in read_annotation(path):
+            counts[obj["label"]] += 1
+    return counts
+
+
+def effective_class_weights(counts: dict[int, int], beta: float, max_weight: float) -> list[float]:
+    foreground = []
+    for category_id in VISDRONE_CATEGORIES:
+        count = max(1, counts[category_id])
+        effective_count = 1.0 - math.pow(beta, count)
+        foreground.append((1.0 - beta) / effective_count)
+    mean_weight = sum(foreground) / len(foreground)
+    normalized = [min(max_weight, max(1.0 / max_weight, value / mean_weight)) for value in foreground]
+    return [1.0, *normalized]
+
+
+def balanced_small_object_roi_forward(self, features, proposals, image_shapes, targets=None):
+    if self.training:
+        if targets is None:
+            raise ValueError("Targets are required during training.")
+        proposals, matched_idxs, labels, regression_targets = self.select_training_samples(proposals, targets)
+    else:
+        matched_idxs = None
+        labels = None
+        regression_targets = None
+
+    box_features = self.box_roi_pool(features, proposals, image_shapes)
+    box_features = self.box_head(box_features)
+    class_logits, box_regression = self.box_predictor(box_features)
+
+    if not self.training:
+        boxes, scores, detected_labels = self.postprocess_detections(
+            class_logits, box_regression, proposals, image_shapes
+        )
+        results = [
+            {"boxes": box, "labels": label, "scores": score}
+            for box, label, score in zip(boxes, detected_labels, scores)
+        ]
+        return results, {}
+
+    if labels is None or regression_targets is None or matched_idxs is None or targets is None:
+        raise ValueError("Missing Faster R-CNN training targets.")
+
+    proposal_weights = [torch.ones_like(image_labels, dtype=class_logits.dtype) for image_labels in labels]
+    if abs(self.small_object_weight - 1.0) > 1e-9:
+        for weights, image_labels, image_matches, target in zip(
+            proposal_weights, labels, matched_idxs, targets
+        ):
+            positive = torch.where(image_labels > 0)[0]
+            if positive.numel() > 0:
+                gt_boxes = target["boxes"][image_matches[positive]]
+                gt_areas = (gt_boxes[:, 2] - gt_boxes[:, 0]).clamp(min=0) * (
+                    gt_boxes[:, 3] - gt_boxes[:, 1]
+                ).clamp(min=0)
+                weights[positive] = torch.where(
+                    gt_areas < self.small_object_area,
+                    torch.full_like(gt_areas, self.small_object_weight),
+                    torch.ones_like(gt_areas),
+                ).to(weights.dtype)
+
+    labels_tensor = torch.cat(labels, dim=0)
+    regression_tensor = torch.cat(regression_targets, dim=0)
+    proposal_weight_tensor = torch.cat(proposal_weights, dim=0)
+    class_weights = class_logits.new_tensor(self.balanced_class_weights)
+
+    cross_entropy = F.cross_entropy(class_logits, labels_tensor, reduction="none")
+    probabilities = F.softmax(class_logits, dim=1)
+    true_probability = probabilities.gather(1, labels_tensor[:, None]).squeeze(1)
+    focal_factor = (1.0 - true_probability).pow(self.focal_gamma)
+    classification_weights = class_weights[labels_tensor] * proposal_weight_tensor
+    classification_loss = (cross_entropy * focal_factor * classification_weights).sum()
+    classification_loss = classification_loss / classification_weights.sum().clamp(min=1.0)
+
+    positive = torch.where(labels_tensor > 0)[0]
+    positive_labels = labels_tensor[positive]
+    sample_count, _ = class_logits.shape
+    box_regression = box_regression.reshape(sample_count, box_regression.size(-1) // 4, 4)
+    box_per_coordinate = F.smooth_l1_loss(
+        box_regression[positive, positive_labels],
+        regression_tensor[positive],
+        beta=1 / 9,
+        reduction="none",
+    )
+    box_per_proposal = box_per_coordinate.sum(dim=1)
+    box_loss = (box_per_proposal * proposal_weight_tensor[positive]).sum()
+    box_loss = box_loss / max(1, labels_tensor.numel())
+    return [], {"loss_classifier": classification_loss, "loss_box_reg": box_loss}
+
+
+def build_model(
+    num_classes: int,
+    min_size: int,
+    max_size: int,
+    pretrained: bool,
+    enhanced_loss: bool = False,
+    class_weights: list[float] | None = None,
+    focal_gamma: float = 2.0,
+    small_object_area: float = 32.0 * 32.0,
+    small_object_weight: float = 2.0,
+    small_anchors: bool = False,
+    detections_per_image: int = 300,
+    score_threshold: float = 0.01,
+):
     weights = FasterRCNN_MobileNet_V3_Large_FPN_Weights.DEFAULT if pretrained else None
-    model = fasterrcnn_mobilenet_v3_large_fpn(weights=weights, min_size=min_size, max_size=max_size)
+    model = fasterrcnn_mobilenet_v3_large_fpn(
+        weights=weights,
+        weights_backbone=None,
+        min_size=min_size,
+        max_size=max_size,
+    )
     in_features = model.roi_heads.box_predictor.cls_score.in_features
     model.roi_heads.box_predictor = FastRCNNPredictor(in_features, num_classes)
+    model.roi_heads.detections_per_img = detections_per_image
+    model.roi_heads.score_thresh = score_threshold
+
+    if small_anchors:
+        sizes = (
+            (8, 16, 32, 64, 128),
+            (16, 32, 64, 128, 256),
+            (32, 64, 128, 256, 512),
+        )
+        ratios = tuple((0.5, 1.0, 2.0) for _ in sizes)
+        model.rpn.anchor_generator = AnchorGenerator(sizes=sizes, aspect_ratios=ratios)
+
+    if enhanced_loss:
+        model.roi_heads.balanced_class_weights = class_weights or [1.0] * num_classes
+        model.roi_heads.focal_gamma = focal_gamma
+        model.roi_heads.small_object_area = small_object_area
+        model.roi_heads.small_object_weight = small_object_weight
+        model.roi_heads.forward = MethodType(balanced_small_object_roi_forward, model.roi_heads)
     return model
 
 
@@ -229,31 +379,105 @@ def update_group(groups: dict[str, dict[str, int]], name: str, matched: bool) ->
         groups[name]["matched"] += 1
 
 
-def match_predictions(gt_objects: list[dict], predictions: list[dict], iou_threshold: float) -> list[bool]:
-    used_predictions: set[int] = set()
+def match_predictions(
+    gt_objects: list[dict], predictions: list[dict], iou_threshold: float
+) -> tuple[list[bool], list[bool]]:
     matched_gt = [False] * len(gt_objects)
-    for gt_index, gt in enumerate(gt_objects):
-        best_index = None
+    matched_predictions = [False] * len(predictions)
+    prediction_order = sorted(range(len(predictions)), key=lambda index: predictions[index]["score"], reverse=True)
+    for pred_index in prediction_order:
+        prediction = predictions[pred_index]
+        best_gt_index = None
         best_iou = 0.0
-        for pred_index, pred in enumerate(predictions):
-            if pred_index in used_predictions:
+        for gt_index, gt in enumerate(gt_objects):
+            if matched_gt[gt_index] or prediction["label"] != gt["label"]:
                 continue
-            if pred["label"] != gt["label"]:
-                continue
-            current_iou = iou(gt["box"], pred["box"])
+            current_iou = iou(gt["box"], prediction["box"])
             if current_iou > best_iou:
                 best_iou = current_iou
-                best_index = pred_index
-        if best_index is not None and best_iou >= iou_threshold:
-            used_predictions.add(best_index)
-            matched_gt[gt_index] = True
-    return matched_gt
+                best_gt_index = gt_index
+        if best_gt_index is not None and best_iou >= iou_threshold:
+            matched_gt[best_gt_index] = True
+            matched_predictions[pred_index] = True
+    return matched_gt, matched_predictions
 
 
 def finalize_group(group: dict[str, int]) -> dict[str, float | int]:
     gt = group["gt"]
     matched = group["matched"]
     return {"gt": gt, "matched": matched, "recall_at_iou": matched / gt if gt else 0.0}
+
+
+def interpolated_ap(true_positive: np.ndarray, false_positive: np.ndarray, total_gt: int) -> float:
+    if total_gt <= 0 or true_positive.size == 0:
+        return 0.0
+    cumulative_tp = np.cumsum(true_positive)
+    cumulative_fp = np.cumsum(false_positive)
+    recall = cumulative_tp / total_gt
+    precision = cumulative_tp / np.maximum(cumulative_tp + cumulative_fp, 1e-12)
+    values = []
+    for recall_threshold in np.linspace(0.0, 1.0, 101):
+        candidates = precision[recall >= recall_threshold]
+        values.append(float(candidates.max()) if candidates.size else 0.0)
+    return float(np.mean(values))
+
+
+def compute_ap_metrics(
+    all_ground_truth: list[list[dict]],
+    all_predictions: list[list[dict]],
+    iou_thresholds: list[float],
+) -> dict:
+    ap_by_threshold: dict[str, float] = {}
+    per_class_ap50: dict[str, float] = {}
+
+    for threshold in iou_thresholds:
+        class_aps = []
+        for category_id, category_name in VISDRONE_CATEGORIES.items():
+            gt_by_image = {
+                image_index: [obj for obj in objects if obj["label"] == category_id]
+                for image_index, objects in enumerate(all_ground_truth)
+            }
+            total_gt = sum(len(objects) for objects in gt_by_image.values())
+            predictions = []
+            for image_index, image_predictions in enumerate(all_predictions):
+                predictions.extend(
+                    (prediction["score"], image_index, prediction["box"])
+                    for prediction in image_predictions
+                    if prediction["label"] == category_id
+                )
+            predictions.sort(key=lambda item: item[0], reverse=True)
+            used = {image_index: set() for image_index in gt_by_image}
+            true_positive = np.zeros(len(predictions), dtype=np.float64)
+            false_positive = np.zeros(len(predictions), dtype=np.float64)
+            for prediction_index, (_, image_index, box) in enumerate(predictions):
+                best_gt_index = None
+                best_iou = 0.0
+                for gt_index, gt in enumerate(gt_by_image[image_index]):
+                    if gt_index in used[image_index]:
+                        continue
+                    current_iou = iou(box, gt["box"])
+                    if current_iou > best_iou:
+                        best_iou = current_iou
+                        best_gt_index = gt_index
+                if best_gt_index is not None and best_iou >= threshold:
+                    used[image_index].add(best_gt_index)
+                    true_positive[prediction_index] = 1.0
+                else:
+                    false_positive[prediction_index] = 1.0
+            ap = interpolated_ap(true_positive, false_positive, total_gt)
+            class_aps.append(ap)
+            if abs(threshold - 0.5) < 1e-9:
+                per_class_ap50[category_name] = ap
+        ap_by_threshold[f"{threshold:.2f}"] = float(np.mean(class_aps)) if class_aps else 0.0
+
+    map50 = ap_by_threshold.get("0.50", 0.0)
+    map50_95 = float(np.mean(list(ap_by_threshold.values()))) if ap_by_threshold else 0.0
+    return {
+        "map50": map50,
+        "map50_95": map50_95,
+        "ap_by_iou": ap_by_threshold,
+        "per_class_ap50": per_class_ap50,
+    }
 
 
 def evaluate(
@@ -271,8 +495,11 @@ def evaluate(
     groups: dict[str, dict[str, int]] = defaultdict(lambda: {"gt": 0, "matched": 0})
     class_groups: dict[str, dict[str, int]] = defaultdict(lambda: {"gt": 0, "matched": 0})
     total_predictions = 0
+    total_matches = 0
     timed_seconds = 0.0
     timed_images = 0
+    all_ground_truth: list[list[dict]] = []
+    all_predictions: list[list[dict]] = []
 
     with torch.inference_mode():
         for image_path in paths[:warmup]:
@@ -297,31 +524,129 @@ def evaluate(
             boxes = output["boxes"].detach().cpu().tolist()
             labels = output["labels"].detach().cpu().tolist()
             scores = output["scores"].detach().cpu().tolist()
-            predictions = [
+            metric_predictions = [
                 {"box": [float(value) for value in box], "label": int(label), "score": float(score)}
                 for box, label, score in zip(boxes, labels, scores)
-                if score >= conf
             ]
-            total_predictions += len(predictions)
+            report_predictions = [prediction for prediction in metric_predictions if prediction["score"] >= conf]
+            total_predictions += len(report_predictions)
             gt_objects = read_annotation(annotations_dir / f"{image_path.stem}.txt")
-            matched = match_predictions(gt_objects, predictions, iou_threshold)
-            for gt, is_matched in zip(gt_objects, matched):
+            matched_gt, matched_predictions = match_predictions(gt_objects, report_predictions, iou_threshold)
+            total_matches += sum(matched_predictions)
+            all_ground_truth.append(gt_objects)
+            all_predictions.append(metric_predictions)
+            for gt, is_matched in zip(gt_objects, matched_gt):
                 update_group(groups, "all", is_matched)
                 update_group(groups, size_bucket(gt["area"]), is_matched)
                 update_group(groups, f"occlusion_{gt['occlusion']}", is_matched)
                 update_group(groups, f"truncation_{gt['truncation']}", is_matched)
                 update_group(class_groups, VISDRONE_CATEGORIES[gt["label"]], is_matched)
 
+    ap_metrics = compute_ap_metrics(
+        all_ground_truth,
+        all_predictions,
+        [round(0.5 + 0.05 * index, 2) for index in range(10)],
+    )
+    total_gt = sum(len(objects) for objects in all_ground_truth)
     return {
         "image_count": timed_images,
         "confidence_threshold": conf,
         "matching_iou_threshold": iou_threshold,
+        "precision_at_conf": total_matches / total_predictions if total_predictions else 0.0,
+        "recall_at_conf": total_matches / total_gt if total_gt else 0.0,
         "fps": timed_images / timed_seconds if timed_seconds > 0 else 0.0,
         "seconds_per_image": timed_seconds / timed_images if timed_images else 0.0,
         "total_predictions": total_predictions,
+        "total_ground_truth": total_gt,
+        "total_matches": total_matches,
+        **ap_metrics,
         "groups": {name: finalize_group(group) for name, group in sorted(groups.items())},
         "classes": {name: finalize_group(group) for name, group in sorted(class_groups.items())},
     }
+
+
+def save_training_plot(results_path: Path, output_path: Path) -> None:
+    with results_path.open("r", encoding="utf-8", newline="") as file:
+        rows = list(csv.DictReader(file))
+    if not rows:
+        return
+    epochs = [int(row["epoch"]) for row in rows]
+    fig, axes = plt.subplots(1, 3, figsize=(14, 4.2))
+    axes[0].plot(epochs, [float(row["train_loss"]) for row in rows], marker="o", color="#1f5d78")
+    axes[0].set_title("Training loss")
+    axes[0].set_xlabel("Epoch")
+    axes[0].grid(alpha=0.25)
+    axes[1].plot(epochs, [float(row["val_map50"]) for row in rows], marker="o", label="AP50")
+    axes[1].plot(epochs, [float(row["val_map50_95"]) for row in rows], marker="o", label="mAP50-95")
+    axes[1].set_title("Detection accuracy")
+    axes[1].set_xlabel("Epoch")
+    axes[1].legend()
+    axes[1].grid(alpha=0.25)
+    axes[2].plot(epochs, [float(row["val_recall"]) for row in rows], marker="o", label="Overall")
+    axes[2].plot(epochs, [float(row["val_small_recall"]) for row in rows], marker="o", label="Small")
+    axes[2].plot(
+        epochs,
+        [float(row["val_heavy_occlusion_recall"]) for row in rows],
+        marker="o",
+        label="Heavy occlusion",
+    )
+    axes[2].set_title("Recall at confidence threshold")
+    axes[2].set_xlabel("Epoch")
+    axes[2].legend()
+    axes[2].grid(alpha=0.25)
+    fig.tight_layout()
+    fig.savefig(output_path, dpi=180, bbox_inches="tight")
+    plt.close(fig)
+
+
+def save_prediction_grid(
+    model,
+    image_paths: list[Path],
+    device: torch.device,
+    output_path: Path,
+    confidence: float,
+    count: int = 6,
+) -> None:
+    if not image_paths:
+        return
+    indices = np.linspace(0, len(image_paths) - 1, min(count, len(image_paths)), dtype=int)
+    fig, axes = plt.subplots(2, math.ceil(len(indices) / 2), figsize=(15, 8))
+    axes = np.asarray(axes).reshape(-1)
+    model.eval()
+    with torch.inference_mode():
+        for axis, index in zip(axes, indices):
+            image_path = image_paths[int(index)]
+            image = read_image(image_path)
+            rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+            tensor = torch.from_numpy(rgb).permute(2, 0, 1).float().to(device) / 255.0
+            output = model([tensor])[0]
+            canvas = image.copy()
+            for box, label, score in zip(output["boxes"], output["labels"], output["scores"]):
+                score_value = float(score.detach().cpu())
+                if score_value < confidence:
+                    continue
+                x1, y1, x2, y2 = [int(round(value)) for value in box.detach().cpu().tolist()]
+                class_id = int(label.detach().cpu())
+                color = (54, 179, 126)
+                cv2.rectangle(canvas, (x1, y1), (x2, y2), color, 2)
+                cv2.putText(
+                    canvas,
+                    f"{VISDRONE_CATEGORIES.get(class_id, str(class_id))} {score_value:.2f}",
+                    (x1, max(16, y1 - 4)),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.45,
+                    color,
+                    1,
+                    cv2.LINE_AA,
+                )
+            axis.imshow(cv2.cvtColor(canvas, cv2.COLOR_BGR2RGB))
+            axis.set_title(image_path.name, fontsize=9)
+            axis.axis("off")
+    for axis in axes[len(indices) :]:
+        axis.axis("off")
+    fig.tight_layout()
+    fig.savefig(output_path, dpi=180, bbox_inches="tight")
+    plt.close(fig)
 
 
 def save_json(path: Path, data: dict) -> None:
@@ -354,7 +679,26 @@ def main() -> None:
     parser.add_argument("--device", default="cuda")
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--resume", type=Path)
+    parser.add_argument("--init-checkpoint", type=Path, help="Initialize model weights without restoring optimizer state.")
+    parser.add_argument("--pretraining-source", default="torchvision_coco", help="Recorded provenance for initialization weights.")
     parser.add_argument("--no-pretrained", action="store_true")
+    parser.add_argument("--enhanced-loss", action="store_true", help="Enable balanced focal loss and area weighting.")
+    parser.add_argument("--focal-loss", action="store_true", help="Enable focal modulation without class balancing.")
+    parser.add_argument("--class-balanced-loss", action="store_true", help="Enable effective-number class weights.")
+    parser.add_argument("--class-balance-beta", type=float, default=0.9999)
+    parser.add_argument("--max-class-weight", type=float, default=4.0)
+    parser.add_argument("--focal-gamma", type=float, default=2.0)
+    parser.add_argument("--small-object-area", type=float, default=32.0 * 32.0)
+    parser.add_argument("--small-object-weight", type=float, default=1.0)
+    parser.add_argument("--small-object-resample-strength", type=float, default=0.0)
+    parser.add_argument("--small-anchors", action="store_true")
+    parser.add_argument("--detections-per-image", type=int, default=300)
+    parser.add_argument("--eval-score-threshold", type=float, default=0.01)
+    parser.add_argument(
+        "--selection-metric",
+        choices=["map50", "map50_95", "recall", "small_recall"],
+        default="map50_95",
+    )
     args = parser.parse_args()
 
     random.seed(args.seed)
@@ -375,16 +719,54 @@ def main() -> None:
         tile_overlap=args.train_tile_overlap,
         min_visible=args.min_visible,
     )
+    sampler = None
+    if args.small_object_resample_strength > 0:
+        sampling_weights = small_object_sampling_weights(
+            train_dataset,
+            area_threshold=args.small_object_area,
+            strength=args.small_object_resample_strength,
+        )
+        sampler = WeightedRandomSampler(sampling_weights, num_samples=len(train_dataset), replacement=True)
     train_loader = DataLoader(
         train_dataset,
         batch_size=args.batch_size,
-        shuffle=True,
+        shuffle=sampler is None,
+        sampler=sampler,
         num_workers=args.workers,
         collate_fn=collate_fn,
         pin_memory=device.type == "cuda",
     )
     val_paths = sorted(args.val_images.glob("*.jpg"))
-    model = build_model(num_classes=11, min_size=args.min_size, max_size=args.max_size, pretrained=not args.no_pretrained)
+    class_counts = count_training_instances(args.train_annotations)
+    computed_class_weights = effective_class_weights(class_counts, args.class_balance_beta, args.max_class_weight)
+    use_class_balance = args.enhanced_loss or args.class_balanced_loss
+    use_focal = args.enhanced_loss or args.focal_loss
+    use_area_weight = args.enhanced_loss or abs(args.small_object_weight - 1.0) > 1e-9
+    class_weights = computed_class_weights if use_class_balance else [1.0] * 11
+    model = build_model(
+        num_classes=11,
+        min_size=args.min_size,
+        max_size=args.max_size,
+        pretrained=not args.no_pretrained and args.init_checkpoint is None,
+        enhanced_loss=use_focal or use_class_balance or use_area_weight,
+        class_weights=class_weights,
+        focal_gamma=args.focal_gamma if use_focal else 0.0,
+        small_object_area=args.small_object_area,
+        small_object_weight=args.small_object_weight if use_area_weight else 1.0,
+        small_anchors=args.small_anchors,
+        detections_per_image=args.detections_per_image,
+        score_threshold=args.eval_score_threshold,
+    )
+    initialization = {
+        "source": args.pretraining_source,
+        "checkpoint": str(args.init_checkpoint) if args.init_checkpoint else None,
+    }
+    if args.init_checkpoint:
+        if not args.init_checkpoint.exists():
+            raise FileNotFoundError(f"Initialization checkpoint not found: {args.init_checkpoint}")
+        initialization_checkpoint = torch.load(args.init_checkpoint, map_location="cpu", weights_only=False)
+        initialization_state = initialization_checkpoint.get("model", initialization_checkpoint)
+        model.load_state_dict(initialization_state, strict=True)
     model.to(device)
 
     optimizer = torch.optim.SGD(
@@ -396,7 +778,8 @@ def main() -> None:
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=max(1, args.epochs // 3), gamma=0.5)
     scaler = torch.amp.GradScaler("cuda", enabled=device.type == "cuda")
     start_epoch = 0
-    best_recall = -1.0
+    best_metric = -1.0
+    best_epoch = 0
 
     if args.resume:
         checkpoint = torch.load(args.resume, map_location=device, weights_only=False)
@@ -404,25 +787,51 @@ def main() -> None:
         optimizer.load_state_dict(checkpoint["optimizer"])
         scheduler.load_state_dict(checkpoint["scheduler"])
         start_epoch = int(checkpoint["epoch"]) + 1
-        best_recall = float(checkpoint.get("best_recall", best_recall))
+        best_metric = float(checkpoint.get("best_metric", checkpoint.get("best_recall", best_metric)))
+        best_epoch = int(checkpoint.get("best_epoch", start_epoch))
 
     config = vars(args).copy()
     config["device"] = str(device)
     config["train_samples"] = len(train_dataset)
+    config["initialization"] = initialization
+    config["class_counts"] = {VISDRONE_CATEGORIES[key]: value for key, value in class_counts.items()}
+    config["class_weights"] = {
+        "background": class_weights[0],
+        **{VISDRONE_CATEGORIES[key]: class_weights[key] for key in VISDRONE_CATEGORIES},
+    }
+    config["computed_class_weights"] = {
+        "background": computed_class_weights[0],
+        **{VISDRONE_CATEGORIES[key]: computed_class_weights[key] for key in VISDRONE_CATEGORIES},
+    }
     save_json(args.output / "args.json", config)
 
+    result_fields = [
+        "epoch",
+        "train_loss",
+        "loss_classifier",
+        "loss_box_reg",
+        "loss_objectness",
+        "loss_rpn_box_reg",
+        "lr",
+        "val_precision",
+        "val_recall",
+        "val_map50",
+        "val_map50_95",
+        "val_small_recall",
+        "val_heavy_occlusion_recall",
+        "val_fps",
+        "elapsed_seconds",
+    ]
     results_path = args.output / "results.csv"
     if start_epoch == 0:
         with results_path.open("w", encoding="utf-8", newline="") as file:
-            writer = csv.DictWriter(
-                file,
-                fieldnames=["epoch", "train_loss", "lr", "val_recall", "val_small_recall", "val_heavy_occlusion_recall", "val_fps"],
-            )
+            writer = csv.DictWriter(file, fieldnames=result_fields)
             writer.writeheader()
 
     for epoch in range(start_epoch, args.epochs):
         model.train()
         epoch_loss = 0.0
+        component_totals: dict[str, float] = defaultdict(float)
         batch_count = 0
         start = time.perf_counter()
         for images, targets in train_loader:
@@ -436,9 +845,14 @@ def main() -> None:
             scaler.step(optimizer)
             scaler.update()
             epoch_loss += float(loss.detach().cpu())
+            for name, value in losses.items():
+                component_totals[name] += float(value.detach().cpu())
             batch_count += 1
         scheduler.step()
         train_loss = epoch_loss / batch_count if batch_count else 0.0
+        component_means = {
+            name: total / batch_count if batch_count else 0.0 for name, total in component_totals.items()
+        }
 
         metrics = evaluate(
             model,
@@ -453,44 +867,64 @@ def main() -> None:
         all_recall = float(metrics["groups"].get("all", {}).get("recall_at_iou", 0.0))
         small_recall = float(metrics["groups"].get("small_lt_32x32", {}).get("recall_at_iou", 0.0))
         heavy_recall = float(metrics["groups"].get("occlusion_2", {}).get("recall_at_iou", 0.0))
+        selection_values = {
+            "map50": float(metrics["map50"]),
+            "map50_95": float(metrics["map50_95"]),
+            "recall": all_recall,
+            "small_recall": small_recall,
+        }
+        current_metric = selection_values[args.selection_metric]
         elapsed = time.perf_counter() - start
 
         epoch_summary = {
             "epoch": epoch + 1,
             "elapsed_seconds": elapsed,
             "train_loss": train_loss,
+            "component_losses": component_means,
             "lr": optimizer.param_groups[0]["lr"],
+            "selection_metric": args.selection_metric,
+            "selection_value": current_metric,
             "validation": metrics,
         }
         save_json(args.output / f"epoch_{epoch + 1:03d}_summary.json", epoch_summary)
         with results_path.open("a", encoding="utf-8", newline="") as file:
-            writer = csv.DictWriter(
-                file,
-                fieldnames=["epoch", "train_loss", "lr", "val_recall", "val_small_recall", "val_heavy_occlusion_recall", "val_fps"],
-            )
+            writer = csv.DictWriter(file, fieldnames=result_fields)
             writer.writerow(
                 {
                     "epoch": epoch + 1,
                     "train_loss": train_loss,
+                    "loss_classifier": component_means.get("loss_classifier", 0.0),
+                    "loss_box_reg": component_means.get("loss_box_reg", 0.0),
+                    "loss_objectness": component_means.get("loss_objectness", 0.0),
+                    "loss_rpn_box_reg": component_means.get("loss_rpn_box_reg", 0.0),
                     "lr": optimizer.param_groups[0]["lr"],
+                    "val_precision": metrics["precision_at_conf"],
                     "val_recall": all_recall,
+                    "val_map50": metrics["map50"],
+                    "val_map50_95": metrics["map50_95"],
                     "val_small_recall": small_recall,
                     "val_heavy_occlusion_recall": heavy_recall,
                     "val_fps": metrics["fps"],
+                    "elapsed_seconds": elapsed,
                 }
             )
 
+        improved = current_metric > best_metric
+        if improved:
+            best_metric = current_metric
+            best_epoch = epoch + 1
         checkpoint = {
             "epoch": epoch,
             "model": model.state_dict(),
             "optimizer": optimizer.state_dict(),
             "scheduler": scheduler.state_dict(),
-            "best_recall": max(best_recall, all_recall),
+            "best_metric": best_metric,
+            "best_epoch": best_epoch,
+            "selection_metric": args.selection_metric,
             "args": config,
         }
         torch.save(checkpoint, checkpoints_dir / "last.pt")
-        if all_recall > best_recall:
-            best_recall = all_recall
+        if improved:
             torch.save(checkpoint, checkpoints_dir / "best.pt")
 
         print(
@@ -498,7 +932,10 @@ def main() -> None:
                 {
                     "epoch": epoch + 1,
                     "train_loss": train_loss,
+                    "val_precision": metrics["precision_at_conf"],
                     "val_recall": all_recall,
+                    "val_map50": metrics["map50"],
+                    "val_map50_95": metrics["map50_95"],
                     "val_small_recall": small_recall,
                     "val_heavy_occlusion_recall": heavy_recall,
                     "val_fps": metrics["fps"],
@@ -508,14 +945,53 @@ def main() -> None:
             )
         )
 
+    best_checkpoint_path = checkpoints_dir / "best.pt"
+    if best_checkpoint_path.exists():
+        best_checkpoint = torch.load(best_checkpoint_path, map_location=device, weights_only=False)
+        model.load_state_dict(best_checkpoint["model"])
+    final_validation = evaluate(
+        model,
+        val_paths,
+        args.val_annotations,
+        device,
+        conf=args.conf,
+        iou_threshold=args.iou,
+        warmup=args.warmup,
+        limit=args.limit_val,
+    )
+    save_training_plot(results_path, args.output / "training_metrics.png")
+    save_prediction_grid(
+        model,
+        val_paths[: args.limit_val] if args.limit_val > 0 else val_paths,
+        device,
+        args.output / "validation_predictions.jpg",
+        confidence=args.conf,
+    )
     final_summary = {
         "model": "fasterrcnn_mobilenet_v3_large_fpn",
         "num_classes": 11,
         "train_samples": len(train_dataset),
         "epochs": args.epochs,
-        "best_recall": best_recall,
-        "best_checkpoint": str(checkpoints_dir / "best.pt"),
+        "initialization": initialization,
+        "enhanced_loss": args.enhanced_loss,
+        "focal_loss": use_focal,
+        "class_balanced_loss": use_class_balance,
+        "small_object_area_weighting": use_area_weight,
+        "small_object_resample_strength": args.small_object_resample_strength,
+        "small_anchors": args.small_anchors,
+        "selection_metric": args.selection_metric,
+        "best_metric": best_metric,
+        "best_epoch": best_epoch,
+        "best_checkpoint": str(best_checkpoint_path),
         "last_checkpoint": str(checkpoints_dir / "last.pt"),
+        "class_counts": config["class_counts"],
+        "class_weights": config["class_weights"],
+        "final_validation": final_validation,
+        "artifacts": {
+            "training_metrics": str(args.output / "training_metrics.png"),
+            "validation_predictions": str(args.output / "validation_predictions.jpg"),
+            "results_csv": str(results_path),
+        },
     }
     save_json(args.output / "summary.json", final_summary)
     print(json.dumps(final_summary, indent=2))

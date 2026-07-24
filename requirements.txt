@@ -24,3 +24,4 @@ onnxruntime-gpu
 # Optional TensorRT deployment
 tensorrt
 nvidia-modelopt[onnx]
+sahi==0.12.2

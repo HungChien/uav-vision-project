@@ -12,5 +12,10 @@ Key documents:
 - `phase3_tracking_baseline.md`
 - `phase4_onnx_export.md`
 - `phase4_lightweight_model_comparison.md`
+- `phase4_mobilenet_aerial_balanced.md`
+- `phase4_mobilenet_small_object_ablation.md`
 - `phase4_pruning_experiment.md`
 - `phase4_tensorrt_int8_benchmark.md`
+- `phase4_int8_scene_calibration.md`
+- `phase4_yolo_distillation.md`
+- `phase4_yolo_small_object_ablation.md`
