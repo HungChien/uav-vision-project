@@ -17,5 +17,6 @@ Key documents:
 - `phase4_pruning_experiment.md`
 - `phase4_tensorrt_int8_benchmark.md`
 - `phase4_int8_scene_calibration.md`
+- `phase4_runtime_memory_benchmark.md`
 - `phase4_yolo_distillation.md`
 - `phase4_yolo_small_object_ablation.md`

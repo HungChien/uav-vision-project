@@ -24,6 +24,7 @@ Deployment:
 - `export_onnx.py`: exports YOLO checkpoints to ONNX and verifies PyTorch versus ONNX outputs. Use `--half --export-only` for FP16 deployment exports.
 - `benchmark_onnxruntime.py`: benchmarks ONNXRuntime CPU and CUDA providers. The input tensor type is matched to the ONNX model precision.
 - `run_pipeline.py`: runs the integrated detection or detection-plus-tracking pipeline on an image, video, or frame directory with PyTorch, ONNX, or TensorRT engine backends.
+- `benchmark_runtime_memory.py`: benchmarks isolated-process peak RAM, per-process GPU memory, latency, and FPS across PyTorch, ONNX, TensorRT, input-size, precision, and detection/tracking scenarios.
 
 Experimental comparisons:
 

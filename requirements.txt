@@ -6,6 +6,8 @@ matplotlib
 seaborn
 tqdm
 pyyaml
+psutil
+nvidia-ml-py
 
 # Deep learning
 torch
