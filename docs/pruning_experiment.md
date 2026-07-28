@@ -1,4 +1,4 @@
-﻿# Phase 4: YOLOv8s Slimming Experiment
+﻿# YOLOv8s Slimming Experiment
 
 ## Goal
 
@@ -170,3 +170,4 @@ Recommended use:
 - Use `YOLOv8n e50` when the strictest model-size constraint matters most.
 - Use `YOLOv8s-slim 0.4375 e100` as the balanced lightweight detector.
 - Keep full `YOLOv8s` as the accuracy-first baseline for longer training and future teacher-student distillation.
+

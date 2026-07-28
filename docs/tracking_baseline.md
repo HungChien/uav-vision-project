@@ -1,4 +1,4 @@
-﻿# Phase 3: Tracking Baseline
+﻿# Tracking Baseline
 
 ## Goal
 
@@ -237,3 +237,4 @@ Class counts:
 | van | 2 |
 
 This run verifies the complete processing flow with the deployment-optimized detector. The system accepts a raw frame directory, performs object detection, assigns persistent track IDs through ByteTrack, and saves both visual outputs and machine-readable tracking results.
+

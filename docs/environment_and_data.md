@@ -1,4 +1,4 @@
-﻿# Phase 1: Environment And Data Understanding
+﻿# Environment and Data Understanding
 
 ## Environment
 
@@ -102,3 +102,4 @@ Run UAV123 EDA after downloading data:
 ```powershell
 & "D:\Anaconda3\envs\ml-gpu\python.exe" scripts/analyze_datasets.py uav123 --annotations data/raw/UAV123/anno --output outputs/eda/uav123
 ```
+

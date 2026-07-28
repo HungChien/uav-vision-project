@@ -1,4 +1,4 @@
-﻿# Phase 2: Data Augmentation
+﻿# Data Augmentation
 
 ## Goal
 
@@ -82,3 +82,4 @@ hsv_v: 0.4
 mosaic: 1.0
 mixup: 0.0
 ```
+

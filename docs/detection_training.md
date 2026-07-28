@@ -1,4 +1,4 @@
-﻿# Phase 2: Detection Training
+﻿# Detection Training
 
 ## Model Choice
 
@@ -80,3 +80,4 @@ Saved weights:
 outputs/training/yolov8s_visdrone_baseline_e10/weights/best.pt
 outputs/training/yolov8s_visdrone_baseline_e10/weights/last.pt
 ```
+

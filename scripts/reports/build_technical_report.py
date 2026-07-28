@@ -16,9 +16,9 @@ from docx.shared import Inches, Pt, RGBColor
 
 
 ROOT = Path(__file__).resolve().parents[2]
-PAPER_DIR = ROOT / "docs" / "paper"
+PAPER_DIR = ROOT / "docs" / "report"
 ASSET_DIR = PAPER_DIR / "assets"
-OUTPUT_DOCX = PAPER_DIR / "uav_vision_ieee_paper.docx"
+OUTPUT_DOCX = PAPER_DIR / "uav_vision_technical_report.docx"
 
 FONT_REGULAR = Path("C:/Windows/Fonts/times.ttf")
 FONT_BOLD = Path("C:/Windows/Fonts/timesbd.ttf")
@@ -562,7 +562,7 @@ def build_document() -> Path:
         "occlusion. The VisDrone benchmark formalized these difficulties for detection and tracking [1], while "
         "UAV123 provides 123 low-altitude single-object tracking sequences [2]. A practical airborne system must "
         "therefore balance localization accuracy, temporal stability, model size, latency, and memory rather than "
-        "optimize a single leaderboard metric.",
+        "optimize a single benchmark metric.",
     )
     add_body(
         doc,
@@ -872,6 +872,10 @@ def build_document() -> Path:
 
 if __name__ == "__main__":
     print(build_document())
+
+
+
+
 
 
 

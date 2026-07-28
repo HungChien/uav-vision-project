@@ -1,4 +1,4 @@
-# Phase 4: UAV Runtime Memory Benchmark
+﻿# UAV Runtime Memory Benchmark
 
 ## Goal
 
@@ -104,7 +104,7 @@ For the current implementation:
 2. Budget at least `1.2 GiB` process RAM for detection and approximately `1.25 GiB` for detection plus ByteTrack in the current Python pipeline, before adding video decoding, application UI, message queues, or other services.
 3. Do not select the current INT8 engine for memory reasons; it is larger, slower, and less accurate than FP16.
 4. For a strict-memory device, move from the Python/Ultralytics wrapper to a minimal C++ TensorRT runtime because approximately `600 MiB` of the measured baseline is Python/framework overhead.
-5. Repeat the benchmark on the real edge device. Jetson-class devices use unified memory, so laptop RAM and discrete VRAM values cannot be added directly or transferred as an absolute requirement.
+5. Repeat the benchmark on the real edge device. Jetson-class devices use unified memory, so laptop RAM and discrete VRAM values cannot be added directly or transferred as an absolute constraint.
 
 On NVIDIA Jetson hardware, the final acceptance test should collect `tegrastats` or `jtop` data for:
 
@@ -123,3 +123,4 @@ On NVIDIA Jetson hardware, the final acceptance test should collect `tegrastats`
 - `docs/assets/runtime_memory_benchmark/summary.json`
 - `docs/assets/runtime_memory_benchmark/summary.csv`
 - `docs/assets/runtime_memory_benchmark/runtime_memory_benchmark.png`
+

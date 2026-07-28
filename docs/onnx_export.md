@@ -1,4 +1,4 @@
-﻿# Phase 4: ONNX Export and Runtime Verification
+﻿# ONNX Export and Runtime Verification
 
 ## Goal
 
@@ -297,3 +297,4 @@ Actual result:
 | FPS | 1.76 |
 
 The unified demo completes the deployment-facing prototype interface: a user can pass a single image, a video, or a directory of ordered frames and receive structured CSV output plus visualized results. The ONNX video path currently uses the Ultralytics ONNX wrapper, so its end-to-end FPS includes preprocessing, postprocessing, drawing, and video writing rather than only raw ONNXRuntime forward time.
+

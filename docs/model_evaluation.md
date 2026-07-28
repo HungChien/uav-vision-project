@@ -1,4 +1,4 @@
-﻿# Phase 2: Model Evaluation
+﻿# Model Evaluation
 
 ## Goal
 
@@ -103,3 +103,4 @@ The model is strongest on cars, which are the most frequent and visually consist
 ## Summary
 
 The model is fast enough for real-time use on the tested GPU, but the current 10-epoch baseline still has limited accuracy. The most important next improvements should target small objects and occluded targets through longer training, milder augmentation, higher image size, tiling, or model scaling.
+

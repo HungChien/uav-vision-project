@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import importlib
 import json
@@ -55,7 +55,7 @@ def main() -> None:
 
     output_dir = Path("outputs/reports")
     output_dir.mkdir(parents=True, exist_ok=True)
-    output_path = output_dir / "phase1_env_check.json"
+    output_path = output_dir / "environment_check.json"
     output_path.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
 
     print(json.dumps(report, ensure_ascii=False, indent=2))
@@ -64,4 +64,5 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
 

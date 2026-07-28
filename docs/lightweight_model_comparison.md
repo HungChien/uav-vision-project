@@ -1,4 +1,4 @@
-﻿# Phase 4: Lightweight Model Comparison
+﻿# Lightweight Model Comparison
 
 ## Goal
 
@@ -192,3 +192,4 @@ The MobileNetV3-FPN fine-tuning run confirms that VisDrone training is necessary
 - Treat MobileNetV3-FPN as a documented experiment rather than the main deployment model unless longer training and better tile mixing improve validation recall.
 - Use `YOLOv8s-slim 0.4375 e100` as the balanced model after pruning-stage recovery, because it is smaller than `YOLOv8s` and more accurate than `YOLOv8n e50` in the current VisDrone evaluation.
 - Continue with FP16 ONNX or TensorRT acceleration for the best deployment candidate before pursuing more complex pruning.
+

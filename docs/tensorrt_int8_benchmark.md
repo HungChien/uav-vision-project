@@ -1,4 +1,4 @@
-# Phase 4: ONNX and TensorRT Deployment Benchmark
+﻿# ONNX and TensorRT Deployment Benchmark
 
 ## Goal
 
@@ -114,6 +114,8 @@ INT8 should not be selected for the current model and calibration setup because 
 
 ## Follow-up Study
 
-Bright, dark, and high-density calibration sets plus backbone, neck, and detection-head mixed-precision variants were evaluated in a follow-up experiment. The expanded study confirmed TensorRT FP16 as the deployment target. See `phase4_int8_scene_calibration.md` for the complete results.
+Bright, dark, and high-density calibration sets plus backbone, neck, and detection-head mixed-precision variants were evaluated in a follow-up experiment. The expanded study confirmed TensorRT FP16 as the deployment target. See `int8_scene_calibration.md` for the complete results.
 
-Runtime RAM, GPU-memory change, latency, and ByteTrack overhead were evaluated separately in `phase4_runtime_memory_benchmark.md`. The runtime study also confirmed TensorRT FP16 as the preferred edge deployment backend and found no memory advantage from the current INT8 engine.
+Runtime RAM, GPU-memory change, latency, and ByteTrack overhead were evaluated separately in `runtime_memory_benchmark.md`. The runtime study also confirmed TensorRT FP16 as the preferred edge deployment backend and found no memory advantage from the current INT8 engine.
+
+
